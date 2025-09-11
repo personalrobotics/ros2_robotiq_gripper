@@ -34,22 +34,44 @@ from launch.substitutions import (
     PathJoinSubstitution,
 )
 from launch.conditions import IfCondition
+from launch_ros.substitutions import FindPackageShare
+from launch_ros.parameter_descriptions import ParameterValue
 import launch_ros
 import os
 
 
 def generate_launch_description():
-    description_pkg_share = launch_ros.substitutions.FindPackageShare(
-        package="robotiq_description"
-    ).find("robotiq_description")
-    default_model_path = os.path.join(
-        description_pkg_share, "urdf", "robotiq_2f_85_gripper.urdf.xacro"
+    args = []
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="description_package",
+            default_value="robotiq_description",
+            description="Default description package with gripper URDF/XACRO files.",
+        )
     )
-    default_rviz_config_path = os.path.join(
-        description_pkg_share, "rviz", "view_urdf.rviz"
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="description_file",
+            default_value="robotiq_2f_85_gripper.urdf.xacro",
+            description="Gripper description file name located in the 'urdf' folder of the description_package.",
+        )
     )
 
-    args = []
+    default_model_path = PathJoinSubstitution(
+        [
+            FindPackageShare(package=LaunchConfiguration("description_package")),
+            "urdf",
+            LaunchConfiguration("description_file"),
+        ]
+    )
+    default_rviz_config_path = PathJoinSubstitution(
+        [
+            FindPackageShare(package=LaunchConfiguration("description_package")),
+            "rviz",
+            "view_urdf.rviz",
+        ]
+    )
+
     args.append(
         launch.actions.DeclareLaunchArgument(
             name="model",
@@ -76,6 +98,33 @@ def generate_launch_description():
             description="Port for communicating with Robotiq hardware",
         )
     )
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="parent",
+            default_value="world",
+            description="Parent link for the Robotiq gripper (default: world)",
+        )
+    )
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="origin",
+            default_value='"0 0 0 0 0 0"',
+            description="Gripper origin as 'x y z r p y' (default: 0 0 0 0 0 0)",
+        )
+    )
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="controllers_file",
+            default_value=PathJoinSubstitution(
+                [
+                    FindPackageShare(package=LaunchConfiguration("description_package")),
+                    "config",
+                    "robotiq_2f_85_controllers.yaml",
+                ]
+            ),
+            description="Path to the controller YAML file",
+        )
+    )
 
     robot_description_content = Command(
         [
@@ -87,6 +136,12 @@ def generate_launch_description():
             " ",
             "com_port:=",
             LaunchConfiguration("com_port"),
+            " ",
+            "parent:=",
+            LaunchConfiguration("parent"),
+            " ",
+            "origin:=",
+            LaunchConfiguration("origin"),
         ]
     )
 
@@ -98,15 +153,10 @@ def generate_launch_description():
 
     update_rate_config_file = PathJoinSubstitution(
         [
-            description_pkg_share,
+            FindPackageShare(package=LaunchConfiguration("description_package")),
             "config",
             "robotiq_update_rate.yaml",
         ]
-    )
-
-    controllers_file = "robotiq_controllers.yaml"
-    initial_joint_controllers = PathJoinSubstitution(
-        [description_pkg_share, "config", controllers_file]
     )
 
     control_node = launch_ros.actions.Node(
@@ -115,7 +165,7 @@ def generate_launch_description():
         parameters=[
             robot_description_param,
             update_rate_config_file,
-            initial_joint_controllers,
+            LaunchConfiguration("controllers_file"),
         ],
     )
 
@@ -140,20 +190,28 @@ def generate_launch_description():
         arguments=[
             "joint_state_broadcaster",
             "--controller-manager",
-            "/controller_manager",
+            "controller_manager",
         ],
     )
 
     robotiq_gripper_controller_spawner = launch_ros.actions.Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["robotiq_gripper_controller", "-c", "/controller_manager"],
+        arguments=[
+            "robotiq_gripper_controller",
+            "--controller-manager",
+            "controller_manager",
+        ],
     )
 
     robotiq_activation_controller_spawner = launch_ros.actions.Node(
         package="controller_manager",
         executable="spawner",
-        arguments=["robotiq_activation_controller", "-c", "/controller_manager"],
+        arguments=[
+            "robotiq_activation_controller",
+            "--controller-manager",
+            "controller_manager",
+        ],
     )
 
     nodes = [
