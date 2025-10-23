@@ -126,6 +126,14 @@ def generate_launch_description():
         )
     )
 
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="tf_prefix",
+            default_value="",
+            description="tf_prefix of the joint names, useful for multi-robot setup.",
+        )
+    )
+    
     robot_description_content = Command(
         [
             PathJoinSubstitution([FindExecutable(name="xacro")]),
@@ -142,6 +150,9 @@ def generate_launch_description():
             " ",
             "origin:=",
             LaunchConfiguration("origin"),
+            " ",
+            "prefix:=",
+            LaunchConfiguration("tf_prefix"),
         ]
     )
 
