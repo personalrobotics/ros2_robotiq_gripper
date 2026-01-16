@@ -133,6 +133,14 @@ def generate_launch_description():
             description="tf_prefix of the joint names, useful for multi-robot setup.",
         )
     )
+
+    args.append(
+        launch.actions.DeclareLaunchArgument(
+            name="use_fake_hardware",
+            default_value="false",
+            description="Use fake/mock hardware for simulation (set to 'true' for simulation).",
+        )
+    )
     
     robot_description_content = Command(
         [
@@ -140,7 +148,8 @@ def generate_launch_description():
             " ",
             LaunchConfiguration("model"),
             " ",
-            "use_fake_hardware:=false",
+            "use_fake_hardware:=",
+            LaunchConfiguration("use_fake_hardware"),
             " ",
             "com_port:=",
             LaunchConfiguration("com_port"),
